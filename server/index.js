@@ -67,8 +67,9 @@ io.on('connection', (socket) => {
 
   socket.on('my-message', (msg) => {
     console.log('message: ' + msg);
-    io.sockets.emit('my broadcast', `server: ${msg}`);
-    // socket.emit('my broadcast', `server: ${msg}`);
+    // io.sockets.emit('my-broadcast', `server: ${msg}`);
+    // socket.emit('my-broadcast', `server: ${msg}`);
+    socket.broadcast.emit('my-broadcast', `server: ${msg}`);
   });
 
 });
