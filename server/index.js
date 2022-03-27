@@ -47,33 +47,47 @@
 //     console.log("err", err);
 //   });
 
-
-const app = require('express')();
-const http = require('http').createServer(app);
-const io = require('socket.io')(http, {
+const app = require("express")();
+const http = require("http").createServer(app);
+const io = require("socket.io")(http, {
   cors: {
-    origins: ['http://localhost:3000']
-  }
+    origins: ["http://localhost:3000"],
+  },
 });
 
-app.get('/', (req, res) => {
-  res.send('<h1>Hey Socket.io</h1>');
+app.get("/", (req, res) => {
+  res.send("<h1>Hey Socket.io</h1>");
 });
 
-io.on('connection', (socket) => {
-  socket.on('disconnect', () => {
-    console.log('user disconnected', socket.id);
+let listUserName = ["A"];
+
+io.on("connection", (socket) => {
+  socket.on("disconnect", () => {
+    console.log("user disconnected", socket.id);
   });
 
-  socket.on('my-message', (msg) => {
-    console.log('message: ' + msg);
+  // socket.join("some room");
+
+  socket.on("my-message", (msg) => {
+    console.log("message: " + msg);
     // io.sockets.emit('my-broadcast', `server: ${msg}`);
-    // socket.emit('my-broadcast', `server: ${msg}`);
-    socket.broadcast.emit('my-broadcast', `server: ${msg}`);
+    socket.emit("my-broadcast", `server: ${msg}`);
+    // socket.broadcast.emit('my-broadcast', `server: ${msg}`);
   });
 
+  socket.on("client-regis-username", (userName) => {
+    const checkUserNameIsExits = listUserName.indexOf(userName);
+
+    if (checkUserNameIsExits !== -1) {
+      socket.emit("server-send-client-register-fail");
+    } else {
+      listUserName.push(userName);
+      socket.emit("server-send-client-register-success", userName);
+      
+    }
+  });
 });
 
 http.listen(5000, () => {
-  console.log('listening on *:5000');
+  console.log("listening on *:5000");
 });
