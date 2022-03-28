@@ -1,50 +1,45 @@
-import React, { useCallback, useContext, useEffect, useState } from "react";
+import React, { useRef, useContext, useEffect, useState } from "react";
 import { SocketContext } from "../../context/socket";
 import "./styles/chatRoomStyles.scss";
 import { useForm } from "react-hook-form";
+import ChatContentInput from "./ChatContentInput";
+import useDebounce from "../../hook/useDebounce";
 
 ChatRoomComponent.propTypes = {};
 
 function ChatRoomComponent(props) {
   const socket = useContext(SocketContext);
   const [showChatForm, setIsShowChatForm] = useState(false);
+  const chatContentRef = useRef(null);
 
-  const { register, handleSubmit } = useForm();
+  const { register, handleSubmit, setValue, getValues } = useForm();
 
-  const [useListUserChat, setListUserChat] = useState(() => {
-    return [
-      {
-        id: 1,
-        userName: "Chuong Tran",
-      },
-      {
-        id: 2,
-        userName: "Diem Phuc",
-      },
-      {
-        id: 3,
-        userName: "Diem Hau",
-      },
-      {
-        id: 4,
-        userName: "Trang",
-      },
-      {
-        id: 5,
-        userName: "Tri",
-      },
-    ];
-  });
+  const [listUserChat, setListUserChat] = useState([]);
+  const [userName, setUserName] = useState({});
+  const [listMessage, setListMessage] = useState([]);
 
   useEffect(() => {
     socket.on("server-send-client-register-fail", handleRegisterFail);
     socket.on("server-send-client-register-success", handleRegisterSuccess);
+    socket.on("server-send-list-user", handleRefreshListUser);
+    socket.on("server-send-list-message", handleRefreshListMessage);
 
     return () => {
       // before the component is destroyed
       socket.off("server-send-client-register-fail", handleRegisterFail);
+      socket.off("server-send-client-register-success", handleRegisterSuccess);
+      socket.off("server-send-list-user", handleRefreshListUser);
+      socket.off("server-send-list-message", handleRefreshListMessage);
     };
   }, [showChatForm]);
+
+  const handleRefreshListMessage = (listMessageFromServer) => {
+    setListMessage(listMessageFromServer);
+  };
+
+  const handleRefreshListUser = (listUser) => {
+    setListUserChat(listUser);
+  };
 
   const handleRegisterFail = () => {
     alert("Đã tồn tại user name này rồi, vui lòng nhập lại!!");
@@ -52,14 +47,20 @@ function ChatRoomComponent(props) {
 
   const handleRegisterSuccess = (data) => {
     setIsShowChatForm(true);
+    setUserName(data);
   };
 
   const renderListUserChat = () => {
-    if (useListUserChat.length > 0) {
+    if (listUserChat.length > 0) {
       return (
         <div className="list-user">
-          {useListUserChat.map((item) => {
-            return <div className="user-item">{item.userName}</div>;
+          {listUserChat.map((item) => {
+            const { userName, id } = item;
+            return (
+              <div className="user-item" key={id}>
+                {userName}
+              </div>
+            );
           })}
         </div>
       );
@@ -69,30 +70,77 @@ function ChatRoomComponent(props) {
   const renderListChatContent = () => {
     return (
       <div className="chat-content__box">
-        <div className="chat-item__box">
-          <div className="user-name">Anh Chuong</div>
-          <div className="chat-content">hello moi nguoi</div>
-        </div>
-        <div className="chat-item__box">
-          <div className="user-name">Phuc</div>
-          <div className="chat-content">em ne</div>
-        </div>
+        {listMessage.map((item) => {
+          const { id, userName, message } = item;
+          return (
+            <div className="chat-item__box" key={id}>
+              <div className="user-name">{userName}</div>
+              <div className="chat-content">{message}</div>
+            </div>
+          );
+        })}
       </div>
     );
   };
 
   const handleSendChat = (event) => {
     event.preventDefault();
-    console.log(
-      "🚀 ~ file: ChatRoomComponent.js ~ line 63 ~ handleSendChat ~ event",
-      event
-    );
+
+    const { chatContent } = getValues();
+
+    handleSendMessage(chatContent);
+  };
+
+  const handleOnchangeContentDebounced = useDebounce((value) => {
+    handleChangeContent(value);
+  }, 100);
+
+  const handleChangeContent = (valueChange) => {
+    // handleDisabledBtnSend(valueChange);
+    setValue("chatContent", valueChange);
+
+    // if (valueChange.trim().length === 0) {
+    //   sendChannelMessage(STATUS_CONSTANTS.END_TYPING);
+    // } else {
+    //   sendChannelMessage(STATUS_CONSTANTS.USER_TYPING);
+    // }
+  };
+
+  const submitMessage = (event) => {
+    event && event.preventDefault();
+    const { chatContent } = getValues();
+    if (!chatContent) return;
+
+    if (chatContent.trim().length === 0) return;
+    // sendChannelMessage(chatContent);
+    setValue("chatContent", "");
+    chatContentRef.current.setValueContent("");
+
+    handleSendMessage(chatContent);
+
+    // listMessagesRef.current.scrollToElement();
+    // handleDisabledBtnSend(null);
+  };
+
+  const handleSendMessage = (message) => {
+    const valuePost = {
+      userName,
+      message,
+    };
+
+    socket.emit("client-send-message", valuePost);
   };
 
   const renderButtonChat = () => {
     return (
       <form onSubmit={handleSendChat} className="form-chat-input">
-        <textarea name="chat" rows="4" cols="50"></textarea>
+        <ChatContentInput
+          ref={chatContentRef}
+          dataPlaceholder="Aa"
+          onChangeInput={handleOnchangeContentDebounced}
+          handleOnEnter={submitMessage}
+        />
+        <textarea name="chat" rows="4" cols="50" onKeyUp={handleSendChat} />
         <input type="submit" />
       </form>
     );

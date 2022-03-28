@@ -59,32 +59,41 @@ app.get("/", (req, res) => {
   res.send("<h1>Hey Socket.io</h1>");
 });
 
-let listUserName = ["A"];
+let listUserName = [];
+let listMessage = [];
 
 io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("user disconnected", socket.id);
   });
 
-  // socket.join("some room");
-
-  socket.on("my-message", (msg) => {
-    console.log("message: " + msg);
-    // io.sockets.emit('my-broadcast', `server: ${msg}`);
-    socket.emit("my-broadcast", `server: ${msg}`);
-    // socket.broadcast.emit('my-broadcast', `server: ${msg}`);
-  });
-
   socket.on("client-regis-username", (userName) => {
-    const checkUserNameIsExits = listUserName.indexOf(userName);
+    const checkUserNameIsExits = listUserName.find(
+      (user) => user.userName === userName
+    );
 
-    if (checkUserNameIsExits !== -1) {
+    if (checkUserNameIsExits) {
       socket.emit("server-send-client-register-fail");
     } else {
-      listUserName.push(userName);
+      listUserName.push({
+        id: socket.id,
+        userName: userName,
+      });
       socket.emit("server-send-client-register-success", userName);
-      
+      io.sockets.emit("server-send-list-user", listUserName);
+      socket.userName = userName;
     }
+  });
+
+  socket.on("client-send-message", (valuePost) => {
+    const newMessage = {
+      ...valuePost,
+      id: socket.id,
+    };
+
+    listMessage.push(newMessage);
+
+    io.sockets.emit("server-send-list-message", listMessage);
   });
 });
 
